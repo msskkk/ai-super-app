@@ -20,7 +20,11 @@
     "upgrade": "프리미엄으로 업그레이드",
     "freeRemaining": "오늘 {{count}}회 남음",
     "premium": "프리미엄",
-    "imageGen": "AI 이미지 생성"
+    "imageGen": "AI 이미지 생성",
+    "privacy": "개인정보 처리방침",
+    "terms": "이용약관",
+    "upgradePremium": "프리미엄 ₩9,900/월",
+    "premiumComingSoon": "프리미엄 플랜 곧 출시 예정"
   },
   "categories": {
     "life": { "name": "라이프" },

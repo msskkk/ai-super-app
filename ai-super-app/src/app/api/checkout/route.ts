@@ -15,10 +15,23 @@ export async function POST(req: NextRequest) {
   }
 
   const stripe = new Stripe(stripeKey);
-  const { deviceId } = await req.json();
+
+  let body: { deviceId?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { deviceId } = body;
 
   if (!deviceId || typeof deviceId !== "string") {
     return NextResponse.json({ error: "Missing device ID" }, { status: 400 });
+  }
+
+  // Validate device ID format (UUID v4)
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {
+    return NextResponse.json({ error: "Invalid device ID" }, { status: 400 });
   }
 
   try {
@@ -45,7 +58,15 @@ export async function POST(req: NextRequest) {
         ? existing.data[0]
         : await stripe.customers.create({ metadata: { deviceId } });
 
-    const origin = req.headers.get("origin") || "https://mt-2sby.vercel.app";
+    const ALLOWED_ORIGINS = [
+      "https://mt-2sby.vercel.app",
+      process.env.NEXT_PUBLIC_APP_URL,
+    ].filter(Boolean);
+
+    const requestOrigin = req.headers.get("origin") || "";
+    const origin = ALLOWED_ORIGINS.includes(requestOrigin)
+      ? requestOrigin
+      : "https://mt-2sby.vercel.app";
 
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,

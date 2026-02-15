@@ -20,7 +20,11 @@
     "upgrade": "升级到高级版",
     "freeRemaining": "今日剩余{{count}}次",
     "premium": "高级版",
-    "imageGen": "AI图像生成"
+    "imageGen": "AI图像生成",
+    "privacy": "隐私政策",
+    "terms": "使用条款",
+    "upgradePremium": "高级版 ¥980/月",
+    "premiumComingSoon": "高级计划即将推出"
   },
   "categories": {
     "life": { "name": "生活" },
