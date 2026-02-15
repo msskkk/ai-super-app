@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
 import { categories } from "@/data/categories";
 import { bundles } from "@/data/bundles";
 import { type Locale, LOCALES, getLocaleLabel, getDict, t } from "@/lib/i18n";
+import { canUse, getRemainingUses, isPremium, recordUse } from "@/lib/usage";
 import type { Bundle, Tool } from "@/data/types";
 
 type View = "home" | "category" | "bundle" | "history";
@@ -14,12 +14,34 @@ interface HistoryEntry {
   bundleId: string;
   toolId: string;
   input: string;
-  output: string;
+  output: string[];
   createdAt: string;
 }
 
+const HISTORY_KEY = "ai-super-app-history";
+const MAX_HISTORY = 50;
+
+function getLocalHistory(): HistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalHistory(entry: Omit<HistoryEntry, "id" | "createdAt">) {
+  const history = getLocalHistory();
+  history.unshift({
+    ...entry,
+    id: Date.now().toString(),
+    createdAt: new Date().toISOString(),
+  });
+  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
 export default function AppShell() {
-  const { data: session } = useSession();
   const [locale, setLocale] = useState<Locale>("ja");
   const [dict, setDict] = useState<Record<string, unknown>>(() => getDict("ja"));
   const [view, setView] = useState<View>("home");
@@ -30,7 +52,7 @@ export default function AppShell() {
   const [results, setResults] = useState<string[]>([]);
   const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [remaining, setRemaining] = useState(2);
+  const [remaining, setRemaining] = useState(() => getRemainingUses());
   const [historyList, setHistoryList] = useState<HistoryEntry[]>([]);
   const [showInfo, setShowInfo] = useState(false);
 
@@ -47,6 +69,8 @@ export default function AppShell() {
     ? bundles.find((b) => b.id === bundleId)
     : undefined;
   const tool: Tool | undefined = bundle ? bundle.tools[toolIdx] : undefined;
+
+  const userIsPremium = isPremium();
 
   function openCategory(id: string) {
     setView("category");
@@ -99,6 +123,12 @@ export default function AppShell() {
   async function processAI() {
     if (!tool || !bundle) return;
 
+    // Check usage limit (client-side)
+    if (!canUse()) {
+      setError(tt("nav.dailyLimitReached"));
+      return;
+    }
+
     setProcessing(true);
     setResults([]);
     setHtmlPreview(null);
@@ -140,19 +170,22 @@ export default function AppShell() {
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.error === "daily_limit") {
-          setError(tt("nav.dailyLimitReached"));
-        } else {
-          setError(data.error || "API error");
-        }
+        setError(data.error || "API error");
       } else {
         setResults(data.results || []);
         if (data.html) {
           setHtmlPreview(data.html);
         }
-        if (data.remaining !== undefined && data.remaining >= 0) {
-          setRemaining(data.remaining);
-        }
+        // Record usage locally
+        recordUse();
+        setRemaining(getRemainingUses());
+        // Save to local history
+        saveLocalHistory({
+          bundleId: bundle.id,
+          toolId: tool.id,
+          input: userInput.slice(0, 500),
+          output: data.results || [],
+        });
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Network error");
@@ -206,35 +239,6 @@ export default function AppShell() {
     );
   }
 
-  const userIsPremium = !!(session?.user as Record<string, unknown>)?.isPremium;
-
-  // ─── Upgrade ───
-  async function handleUpgrade() {
-    if (!session) { signIn(); return; }
-    try {
-      const res = await fetch("/api/checkout", { method: "POST" });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-      else setError(data.error || "Stripe not configured");
-    } catch { setError("Network error"); }
-  }
-
-  // ─── History ───
-  async function loadHistory() {
-    if (!session) return;
-    try {
-      const res = await fetch("/api/history");
-      const data = await res.json();
-      setHistoryList(data.history || []);
-    } catch { /* ignore */ }
-  }
-
-  function openHistory() {
-    loadHistory();
-    setView("history");
-    window.scrollTo(0, 0);
-  }
-
   // ─── Usage badge ───
   function UsageBadge() {
     if (userIsPremium) {
@@ -251,23 +255,11 @@ export default function AppShell() {
     );
   }
 
-  // ─── Auth button ───
-  function AuthButton() {
-    if (!session) {
-      return (
-        <button onClick={() => signIn()} className="text-[10px] text-blue-600 font-medium hover:underline">
-          ログイン
-        </button>
-      );
-    }
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] text-gray-500">{session.user?.name || session.user?.email}</span>
-        <button onClick={() => signOut()} className="text-[10px] text-gray-400 hover:text-gray-600">
-          ログアウト
-        </button>
-      </div>
-    );
+  // ─── History (localStorage) ───
+  function openHistory() {
+    setHistoryList(getLocalHistory());
+    setView("history");
+    window.scrollTo(0, 0);
   }
 
   // ─── HISTORY VIEW ───
@@ -278,7 +270,7 @@ export default function AppShell() {
           <div className="flex items-center justify-between mb-4">
             <BackButton onClick={goHome} />
           </div>
-          <h1 className="text-2xl font-bold">📋 {tt("nav.history") || "履歴"}</h1>
+          <h1 className="text-2xl font-bold">{tt("nav.history") || "履歴"}</h1>
         </div>
         <div className="px-2 pb-16 space-y-3">
           {historyList.length === 0 && (
@@ -295,7 +287,7 @@ export default function AppShell() {
                 </div>
                 <p className="text-xs text-gray-500 mb-2 truncate">{h.input}</p>
                 <div className="space-y-1">
-                  {(JSON.parse(h.output) as string[]).slice(0, 3).map((line, i) => (
+                  {h.output.slice(0, 3).map((line, i) => (
                     <p key={i} className="text-xs text-gray-600 bg-gray-50 rounded p-1.5">{line}</p>
                   ))}
                 </div>
@@ -321,20 +313,17 @@ export default function AppShell() {
           <div className="flex flex-col items-end gap-2">
             <LangSwitcher />
             <UsageBadge />
-            <AuthButton />
           </div>
         </div>
 
         {/* Action bar */}
         <div className="flex gap-2 mb-8">
-          {session && (
-            <button onClick={openHistory} className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
-              📋 履歴
-            </button>
-          )}
-          {session && !userIsPremium && (
-            <button onClick={handleUpgrade} className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity">
-              ⭐ プレミアム ¥980/月
+          <button onClick={openHistory} className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
+            履歴
+          </button>
+          {!userIsPremium && (
+            <button className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity">
+              プレミアム ¥980/月
             </button>
           )}
         </div>
@@ -579,7 +568,6 @@ export default function AppShell() {
                     }
                   };
                   resize();
-                  // Re-resize after images load
                   iframe.contentDocument?.querySelectorAll("img").forEach((img) => {
                     img.addEventListener("load", resize);
                   });
@@ -593,7 +581,7 @@ export default function AppShell() {
                 onClick={processAI}
                 className={`px-4 py-2 text-xs font-medium text-white rounded-lg bg-gradient-to-r ${bundle.gradient} hover:opacity-90 transition-opacity`}
               >
-                🔄 {tt("nav.regenerate")}
+                {tt("nav.regenerate")}
               </button>
             </div>
           </div>
@@ -622,7 +610,7 @@ export default function AppShell() {
                 onClick={processAI}
                 className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                🔄 {tt("nav.regenerate")}
+                {tt("nav.regenerate")}
               </button>
             </div>
           </div>
