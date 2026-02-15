@@ -141,8 +141,9 @@ export async function POST(req: NextRequest) {
       : aiPrompt + localeInstruction + "\n\n" + fallbackFormatPrompt;
 
     const client = new Anthropic();
+    const useSonnet = toolJsonPrompt && toolId && ["logo", "color", "thumbnail", "plan", "recipe", "calorie", "mockup"].includes(toolId);
     const message = await client.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: useSonnet ? "claude-sonnet-4-5-20250929" : "claude-haiku-4-5-20251001",
       max_tokens: toolJsonPrompt ? 6144 : 3072,
       system: systemPrompt,
       messages: [{ role: "user", content: userInput }],

@@ -1,5 +1,5 @@
 const STORAGE_KEY = "ai-super-app-usage";
-const FREE_DAILY_LIMIT = 30;
+const FREE_DAILY_LIMIT = 10;
 
 interface UsageData {
   date: string;
