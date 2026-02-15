@@ -13,12 +13,31 @@ function SignInForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(
+    authError ? "メールアドレスまたはパスワードが正しくありません" : ""
+  );
+  const [success, setSuccess] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
     setLoading(true);
-    await signIn("credentials", { email, password, callbackUrl });
-    setLoading(false);
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError("メールアドレスまたはパスワードが正しくありません");
+      setLoading(false);
+    } else {
+      setSuccess(true);
+      setTimeout(() => {
+        window.location.href = callbackUrl;
+      }, 800);
+    }
   }
 
   return (
@@ -33,47 +52,55 @@ function SignInForm() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
-        {authError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
-            メールアドレスまたはパスワードが正しくありません
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 text-center">
+            ログインしました！移動します...
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">
-              メールアドレス
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              required
-            />
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+            {error}
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">
-              パスワード
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl text-white font-semibold text-sm bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {loading ? "ログイン中..." : "ログイン"}
-          </button>
-        </form>
+        )}
+
+        {!success && (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                メールアドレス
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                パスワード
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {loading ? "ログイン中..." : "ログイン"}
+            </button>
+          </form>
+        )}
 
         <p className="text-sm text-center text-gray-500">
           アカウントをお持ちでないですか？{" "}
