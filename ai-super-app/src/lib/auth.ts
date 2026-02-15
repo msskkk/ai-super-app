@@ -7,7 +7,13 @@ import { prisma } from "@/lib/prisma";
 export const authOptions: NextAuthOptions = {
   adapter: prisma ? PrismaAdapter(prisma) : undefined,
   session: { strategy: "jwt" },
-  secret: process.env.NEXTAUTH_SECRET || "dev-secret-change-in-production",
+  secret: (() => {
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (!secret) {
+      throw new Error("NEXTAUTH_SECRET environment variable is required");
+    }
+    return secret;
+  })(),
   providers: [
     CredentialsProvider({
       name: "Email",

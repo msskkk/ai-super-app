@@ -20,18 +20,19 @@ export async function POST(req: Request) {
       );
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return NextResponse.json(
-        { error: "パスワードは6文字以上にしてください" },
+        { error: "パスワードは8文字以上にしてください" },
         { status: 400 }
       );
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
+      // Return same success-like response to prevent account enumeration
       return NextResponse.json(
-        { error: "このメールアドレスは既に登録されています" },
-        { status: 409 }
+        { message: "登録処理を受け付けました" },
+        { status: 200 }
       );
     }
 
