@@ -81,43 +81,87 @@ const logo: ToolTemplate = {
 // ─── TRAVEL PLAN ───
 const plan: ToolTemplate = {
   prompt: `必ずJSON形式のみで回答（説明テキスト不要、JSONだけ）:
-{"title":"タイトル","days":[{"day":1,"theme":"テーマ","activities":[{"time":"09:00","title":"名称","detail":"詳細","icon":"絵文字","cost":"¥5000"}],"hotel":{"name":"名前","area":"エリア","price":"¥25000/泊","rating":4.5}}],"budget":{"transport":0,"hotel":0,"food":0,"activity":0},"tips":["tip1"]}
-日数が多い場合は主要5日分に絞ってください。各日3アクティビティまで。`,
+{"title":"タイトル","subtitle":"例: 4泊5日 バルセロナ建築とグルメの旅","days":[{"day":1,"theme":"テーマ","activities":[{"time":"09:00","title":"名称","detail":"具体的な説明（見どころ、所要時間、なぜおすすめか）","icon":"絵文字","cost":"¥5000","duration":"2時間","url":"https://公式サイトまたはGoogle Maps URL","category":"観光|グルメ|移動|体験"}],"meals":[{"type":"昼食","name":"店名","genre":"ジャンル","price":"¥2000","recommend":"おすすめメニュー","url":"https://食べログやGoogle Maps等のURL"}],"hotel":{"name":"ホテル名","area":"エリア","price":"¥25000/泊","rating":4.5,"url":"https://予約サイトURL","features":["駅近","朝食付き"]}}],"budget":{"transport":0,"hotel":0,"food":0,"activity":0},"packing":["必須の持ち物1","持ち物2"],"tips":["実用的なアドバイス1"]}
+日数が多い場合は主要5日分に絞ってください。各日3-4アクティビティまで。具体的な店名・スポット名・URLを可能な限り含めてください。`,
   render: (raw, _ui) => {
-    const d = parseJSON(raw) as { title: string; days: Array<{ day: number; theme: string; activities: Array<{ time: string; title: string; detail: string; icon: string; cost: string }>; hotel?: { name: string; area: string; price: string; rating: number } }>; budget?: Record<string, number>; tips?: string[] } | null;
+    type Activity = { time: string; title: string; detail: string; icon: string; cost: string; duration?: string; url?: string; category?: string };
+    type Meal = { type: string; name: string; genre?: string; price?: string; recommend?: string; url?: string };
+    type Hotel = { name: string; area: string; price: string; rating: number; url?: string; features?: string[] };
+    type Day = { day: number; theme: string; activities: Activity[]; meals?: Meal[]; hotel?: Hotel };
+    type PlanData = { title: string; subtitle?: string; days: Day[]; budget?: Record<string, number>; packing?: string[]; tips?: string[] };
+    const d = parseJSON(raw) as PlanData | null;
     if (!d?.days?.length) return "";
     const gr = ["#667eea,#764ba2", "#f093fb,#f5576c", "#4facfe,#00f2fe", "#43e97b,#38f9d7", "#fa709a,#fee140"];
+    const catColors: Record<string, string> = { "観光": "#6366f1", "グルメ": "#f59e0b", "移動": "#64748b", "体験": "#ec4899" };
     let html = `<div style="font-family:${F};max-width:480px;margin:0 auto;">
-      <div style="background:linear-gradient(135deg,#4facfe,#00f2fe);color:#fff;padding:20px;border-radius:16px;margin-bottom:20px;text-align:center;">
-        <div style="font-size:20px;font-weight:800;">${d.title || "旅行プラン"}</div>
-        <div style="font-size:12px;opacity:0.8;margin-top:4px;">${d.days.length}日間</div>
+      <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;padding:24px 20px;border-radius:20px;margin-bottom:20px;text-align:center;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.1);"></div>
+        <div style="position:absolute;bottom:-30px;left:-10px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.08);"></div>
+        <div style="font-size:28px;margin-bottom:8px;">✈️</div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:0.5px;">${d.title || "旅行プラン"}</div>
+        ${d.subtitle ? `<div style="font-size:12px;opacity:0.85;margin-top:6px;line-height:1.4;">${d.subtitle}</div>` : `<div style="font-size:12px;opacity:0.8;margin-top:4px;">${d.days.length}日間</div>`}
       </div>`;
     d.days.forEach((day, di) => {
       const g = gr[di % gr.length];
-      html += `<div style="display:flex;align-items:center;gap:12px;margin:20px 0 10px;">
-        <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${g});display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0;">Day${day.day}</div>
-        <div style="font-size:15px;font-weight:700;color:#1e293b;">${day.theme || ""}</div>
+      const gc = g.split(",")[0];
+      html += `<div style="margin:24px 0 12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,${g});display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;flex-shrink:0;box-shadow:0 4px 12px ${gc}40;">DAY ${day.day}</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#1e293b;">${day.theme || ""}</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${day.activities?.length || 0} spots</div>
+          </div>
+        </div>
       </div>`;
       day.activities?.forEach((a) => {
-        html += `<div style="display:flex;gap:10px;padding:10px 12px;margin:4px 0 4px 24px;background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.05);border-left:3px solid ${g.split(",")[0]};">
-          <span style="font-size:18px;margin-top:1px;">${a.icon || "📍"}</span>
-          <div style="flex:1;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:11px;color:#6366f1;font-weight:700;">${a.time || ""}</span>
-              ${a.cost ? `<span style="font-size:10px;color:#059669;background:#ecfdf5;padding:2px 8px;border-radius:99px;font-weight:600;">${a.cost}</span>` : ""}
+        const cc = a.category ? (catColors[a.category] || gc) : gc;
+        html += `<div style="display:flex;gap:10px;padding:12px 14px;margin:6px 0 6px 16px;background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:3px solid ${cc};">
+          <span style="font-size:22px;margin-top:2px;">${a.icon || "📍"}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
+              <span style="font-size:11px;color:${cc};font-weight:700;">${a.time || ""}</span>
+              <div style="display:flex;gap:4px;align-items:center;">
+                ${a.duration ? `<span style="font-size:9px;color:#94a3b8;background:#f1f5f9;padding:2px 6px;border-radius:4px;">⏱${a.duration}</span>` : ""}
+                ${a.cost ? `<span style="font-size:10px;color:#059669;background:#ecfdf5;padding:2px 8px;border-radius:99px;font-weight:600;">${a.cost}</span>` : ""}
+              </div>
             </div>
-            <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:2px;">${a.title}</div>
-            ${a.detail ? `<div style="font-size:11px;color:#64748b;margin-top:1px;">${a.detail}</div>` : ""}
+            <div style="font-size:14px;font-weight:700;color:#1e293b;margin-top:3px;">${a.title}</div>
+            ${a.detail ? `<div style="font-size:11px;color:#64748b;margin-top:3px;line-height:1.5;">${a.detail}</div>` : ""}
+            ${a.url ? `<a href="${a.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#3b82f6;margin-top:4px;text-decoration:none;font-weight:600;">🔗 詳細を見る</a>` : ""}
           </div>
         </div>`;
       });
+      if (day.meals?.length) {
+        day.meals.forEach((m) => {
+          html += `<div style="margin:6px 0 6px 16px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border-radius:14px;padding:12px 14px;border:1px solid #fed7aa;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:16px;">🍽️</span>
+              <span style="font-size:10px;color:#c2410c;font-weight:700;background:#fff7ed;padding:1px 8px;border-radius:99px;border:1px solid #fdba74;">${m.type}</span>
+              <span style="font-size:13px;font-weight:700;color:#9a3412;flex:1;">${m.name}</span>
+              ${m.price ? `<span style="font-size:11px;color:#ea580c;font-weight:600;">${m.price}</span>` : ""}
+            </div>
+            ${m.genre || m.recommend ? `<div style="margin-top:4px;font-size:11px;color:#c2410c;">
+              ${m.genre ? `<span style="margin-right:8px;">${m.genre}</span>` : ""}
+              ${m.recommend ? `<span>👨‍🍳 ${m.recommend}</span>` : ""}
+            </div>` : ""}
+            ${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#ea580c;margin-top:4px;text-decoration:none;font-weight:600;">🔗 お店を見る</a>` : ""}
+          </div>`;
+        });
+      }
       if (day.hotel) {
         const h = day.hotel;
-        html += `<div style="margin:6px 0 0 24px;background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:12px;padding:10px 12px;border:1px solid #fcd34d;">
-          <div style="display:flex;align-items:center;gap:6px;"><span>🏨</span><span style="font-size:13px;font-weight:700;color:#92400e;">${h.name}</span></div>
-          <div style="display:flex;gap:10px;font-size:11px;color:#a16207;margin-top:3px;">
-            <span>📍${h.area || ""}</span><span style="color:#d97706;">${"★".repeat(Math.floor(h.rating || 4))}</span><span style="font-weight:700;">${h.price || ""}</span>
+        html += `<div style="margin:8px 0 0 16px;background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:14px;padding:12px 14px;border:1px solid #fcd34d;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:16px;">🏨</span>
+            <span style="font-size:14px;font-weight:700;color:#92400e;flex:1;">${h.name}</span>
           </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">
+            <span style="font-size:11px;color:#a16207;">📍${h.area || ""}</span>
+            <span style="font-size:11px;color:#d97706;">${"★".repeat(Math.floor(h.rating || 4))}</span>
+            <span style="font-size:12px;font-weight:700;color:#92400e;">${h.price || ""}</span>
+          </div>
+          ${h.features?.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">${h.features.map((f: string) => `<span style="font-size:9px;background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:99px;border:1px solid #fde047;">✓ ${f}</span>`).join("")}</div>` : ""}
+          ${h.url ? `<a href="${h.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#b45309;margin-top:6px;text-decoration:none;font-weight:600;">🔗 予約サイト</a>` : ""}
         </div>`;
       }
     });
@@ -128,7 +172,8 @@ const plan: ToolTemplate = {
         const bc = ["#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6"];
         const lb: Record<string, string> = { transport: "交通費", hotel: "宿泊費", food: "食費", activity: "アクティビティ", other: "その他" };
         html += `<div style="background:#fff;border-radius:16px;padding:16px;margin:20px 0;border:1px solid #e2e8f0;">
-          <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:12px;">💰 予算: ¥${total.toLocaleString()}</div>`;
+          <div style="font-size:15px;font-weight:800;color:#1e293b;margin-bottom:4px;">💰 予算概算</div>
+          <div style="font-size:24px;font-weight:900;color:#6366f1;margin-bottom:12px;">¥${total.toLocaleString()}</div>`;
         entries.forEach(([k, v], i) => {
           const pct = Math.round(v / total * 100);
           html += `<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span style="color:#64748b;">${lb[k] || k}</span><span style="font-weight:700;">¥${v.toLocaleString()} (${pct}%)</span></div>
@@ -137,10 +182,17 @@ const plan: ToolTemplate = {
         html += `</div>`;
       }
     }
+    if (d.packing?.length) {
+      html += `<div style="background:#eff6ff;border-radius:14px;padding:14px;margin-bottom:12px;border:1px solid #bfdbfe;">
+        <div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:8px;">🧳 持ち物チェック</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+      d.packing.forEach((p) => { html += `<span style="font-size:11px;background:#dbeafe;color:#1e40af;padding:4px 10px;border-radius:8px;">☐ ${p}</span>`; });
+      html += `</div></div>`;
+    }
     if (d.tips?.length) {
-      html += `<div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;">
-        <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:6px;">💡 ポイント</div>`;
-      d.tips.forEach((t) => { html += `<div style="font-size:11px;color:#15803d;padding:3px 0;">✓ ${t}</div>`; });
+      html += `<div style="background:#f0fdf4;border-radius:14px;padding:14px;border:1px solid #bbf7d0;">
+        <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:8px;">💡 旅のポイント</div>`;
+      d.tips.forEach((t) => { html += `<div style="font-size:11px;color:#15803d;padding:4px 0;line-height:1.5;">✓ ${t}</div>`; });
       html += `</div>`;
     }
     html += `</div>`;

@@ -164,7 +164,7 @@ export const bundles: Bundle[] = [
       {id:"plan",nameKey:"tools.travel.plan",emoji:"🗺️",type:"form-input",
         inputLabelKey:"tools.travel.plan_input",outputLabelKey:"tools.travel.plan_output",
         fields:[{name:"目的地",placeholder:"例: バルセロナ"},{name:"期間",placeholder:"例: 4泊5日"},{name:"予算",placeholder:"例: 30万円"},{name:"興味",placeholder:"例: 建築、グルメ"}],
-        aiPrompt:"あなたは旅行プランナーです。条件に合った日ごとの旅行プランを作成してください。移動手段、所要時間、おすすめスポットを記載してください。"},
+        aiPrompt:"あなたはプロの旅行プランナーです。条件に合った具体的で実用的な日ごとの旅行プランを作成してください。実在する具体的なスポット名・レストラン名・ホテル名を使い、Google Maps等のURLも可能な限り含めてください。移動手段、所要時間、費用目安、おすすめの食事スポットも記載してください。"},
       {id:"pack",nameKey:"tools.travel.pack",emoji:"🧳",type:"form-input",
         inputLabelKey:"tools.travel.pack_input",outputLabelKey:"tools.travel.pack_output",
         fields:[{name:"目的地",placeholder:"例: ハワイ"},{name:"期間",placeholder:"例: 5日間"},{name:"季節",placeholder:"例: 夏"}],
