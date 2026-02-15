@@ -577,7 +577,7 @@ export default function AppShell() {
           <div className="mt-5 fadein">
             <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
               <iframe
-                sandbox=""
+                sandbox="allow-popups allow-popups-to-escape-sandbox"
                 srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:;"><style>*{box-sizing:border-box}body{margin:0;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6;-webkit-font-smoothing:antialiased}img{max-width:100%;border-radius:12px;}</style></head><body>${htmlPreview}</body></html>`}
                 className="w-full border-0"
                 style={{ minHeight: "500px" }}
