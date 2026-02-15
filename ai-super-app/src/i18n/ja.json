@@ -21,7 +21,11 @@
     "freeRemaining": "残り{{count}}回(今日)",
     "premium": "プレミアム",
     "history": "履歴",
-    "imageGen": "AI画像生成"
+    "imageGen": "AI画像生成",
+    "privacy": "プライバシーポリシー",
+    "terms": "利用規約",
+    "upgradePremium": "プレミアム ¥980/月",
+    "premiumComingSoon": "プレミアムプランは近日公開予定です"
   },
   "categories": {
     "life": { "name": "暮らし" },

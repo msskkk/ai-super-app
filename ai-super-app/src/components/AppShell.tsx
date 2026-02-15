@@ -13,6 +13,7 @@ import {
   refreshPremiumStatus,
 } from "@/lib/usage";
 import { getDeviceId } from "@/lib/device-id";
+import { getPlatform } from "@/lib/platform";
 import type { Bundle, Tool } from "@/data/types";
 
 type View = "home" | "category" | "bundle" | "history";
@@ -81,6 +82,7 @@ export default function AppShell() {
   useEffect(() => {
     setDict(getDict(locale));
     document.documentElement.lang = locale;
+    localStorage.setItem("ai-super-app-locale", locale);
   }, [locale]);
 
   const tt = useCallback(
@@ -359,6 +361,16 @@ export default function AppShell() {
             <button
               disabled={checkingOut}
               onClick={async () => {
+                const platform = getPlatform();
+
+                // Native app: use native IAP (to be implemented with RevenueCat/StoreKit)
+                if (platform === "ios" || platform === "android") {
+                  // TODO: Implement native IAP via Capacitor plugin
+                  alert(tt("nav.premiumComingSoon") || "プレミアムプランは近日公開予定です");
+                  return;
+                }
+
+                // Web: use Stripe checkout
                 setCheckingOut(true);
                 try {
                   const res = await fetch("/api/checkout", {
@@ -368,7 +380,6 @@ export default function AppShell() {
                   });
                   const data = await res.json();
                   if (data.premium) {
-                    // Already subscribed
                     const { setPremium } = await import("@/lib/usage");
                     setPremium(true);
                     setRemaining(Infinity);
@@ -387,7 +398,7 @@ export default function AppShell() {
               }}
               className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              {checkingOut ? "..." : "プレミアム ¥980/月"}
+              {checkingOut ? "..." : tt("nav.upgradePremium")}
             </button>
           )}
         </div>
@@ -415,9 +426,19 @@ export default function AppShell() {
             </button>
           ))}
         </div>
-        <p className="text-center text-[10px] text-gray-300 mt-16">
-          {tt("app.footer")}
-        </p>
+        <div className="text-center mt-16 space-y-2">
+          <div className="flex justify-center gap-3">
+            <a href="/privacy" className="text-[10px] text-gray-400 hover:text-gray-600 underline">
+              {tt("nav.privacy")}
+            </a>
+            <a href="/terms" className="text-[10px] text-gray-400 hover:text-gray-600 underline">
+              {tt("nav.terms")}
+            </a>
+          </div>
+          <p className="text-[10px] text-gray-300">
+            {tt("app.footer")}
+          </p>
+        </div>
       </main>
     );
   }

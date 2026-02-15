@@ -20,7 +20,11 @@
     "upgrade": "Upgrade to Premium",
     "freeRemaining": "{{count}} free uses left (today)",
     "premium": "Premium",
-    "imageGen": "AI Image Generation"
+    "imageGen": "AI Image Generation",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "upgradePremium": "Premium $6.99/mo",
+    "premiumComingSoon": "Premium plan coming soon"
   },
   "categories": {
     "life": { "name": "Lifestyle" },
