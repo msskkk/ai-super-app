@@ -20,6 +20,7 @@ function textToStyledHtml(text: string): string {
   let html = `<div style="max-width:480px;margin:0 auto;font-family:${SF};">`;
   let ci = 0, inCards = false;
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#1e293b;">$1</strong>');
+  const linkify = (s: string) => s.replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:none;font-weight:600;">🔗 リンク</a>');
 
   for (const line of lines) {
     const t = line.trim();
@@ -27,19 +28,33 @@ function textToStyledHtml(text: string): string {
     if (t.startsWith("# ")) {
       if (inCards) { html += "</div>"; inCards = false; }
       const c = FCOLORS[ci % FCOLORS.length]; ci++;
-      html += `<div style="background:${c.bg};color:#fff;padding:16px 20px;border-radius:14px;margin:16px 0 12px;font-size:17px;font-weight:800;">${t.slice(2)}</div>`;
+      html += `<div style="background:${c.bg};color:#fff;padding:16px 20px;border-radius:14px;margin:18px 0 12px;font-size:17px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,0.1);">${t.slice(2)}</div>`;
+    } else if (t.startsWith("## ")) {
+      if (inCards) html += "</div>";
+      const c = FCOLORS[ci % FCOLORS.length]; ci++;
+      html += `<div style="margin:16px 0 8px;padding:10px 14px;background:${c.light};border-left:4px solid ${c.border};border-radius:0 10px 10px 0;font-weight:700;color:${c.text};font-size:13px;">${t.slice(3)}</div><div style="padding:0 2px;">`;
+      inCards = true;
     } else if (t.startsWith("**") && t.endsWith("**") && t.indexOf("**", 2) === t.length - 2) {
       if (inCards) html += "</div>";
       const c = FCOLORS[ci % FCOLORS.length]; ci++;
-      html += `<div style="margin:20px 0 8px;padding:12px 16px;background:${c.light};border-left:4px solid ${c.border};border-radius:0 10px 10px 0;font-weight:700;color:${c.text};font-size:14px;">${t.slice(2, -2)}</div><div style="padding:0 2px;">`;
+      html += `<div style="margin:16px 0 8px;padding:12px 16px;background:${c.light};border-left:4px solid ${c.border};border-radius:0 12px 12px 0;font-weight:700;color:${c.text};font-size:14px;">${t.slice(2, -2)}</div><div style="padding:0 2px;">`;
       inCards = true;
+    } else if (/^\d+\.\s/.test(t)) {
+      const num = t.match(/^(\d+)\.\s*/)!;
+      const content = t.slice(num[0].length);
+      const c = FCOLORS[ci % FCOLORS.length];
+      html += `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;margin:6px 0;background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.06);font-size:13px;line-height:1.6;">
+        <span style="width:24px;height:24px;border-radius:50%;background:${c.bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;">${num[1]}</span>
+        <span style="color:#334155;flex:1;">${linkify(bold(content))}</span></div>`;
     } else if (/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u.test(t)) {
       const em = t.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u)!;
-      html += `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin:6px 0;background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.06);font-size:13px;line-height:1.6;"><span style="font-size:20px;flex-shrink:0;">${em[0].trim()}</span><span style="color:#334155;">${bold(t.slice(em[0].length))}</span></div>`;
+      html += `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin:6px 0;background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.06);font-size:13px;line-height:1.6;"><span style="font-size:20px;flex-shrink:0;">${em[0].trim()}</span><span style="color:#334155;flex:1;">${linkify(bold(t.slice(em[0].length)))}</span></div>`;
+    } else if (/^\s+[-・•]\s/.test(line)) {
+      html += `<div style="display:flex;align-items:flex-start;gap:6px;padding:4px 14px 4px 36px;margin:2px 0;font-size:12px;line-height:1.6;color:#64748b;"><span style="color:#c0c8d4;font-size:6px;margin-top:6px;">●</span><span>${linkify(bold(t.replace(/^[-・•]\s*/, "")))}</span></div>`;
     } else if (/^[-・•]\s/.test(t)) {
-      html += `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;margin:4px 0;font-size:13px;line-height:1.6;color:#475569;"><span style="color:#94a3b8;font-size:8px;margin-top:6px;">●</span><span>${bold(t.replace(/^[-・•]\s*/, ""))}</span></div>`;
+      html += `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;margin:4px 0;font-size:13px;line-height:1.6;color:#475569;"><span style="color:#94a3b8;font-size:8px;margin-top:6px;">●</span><span>${linkify(bold(t.replace(/^[-・•]\s*/, "")))}</span></div>`;
     } else {
-      html += `<div style="padding:6px 14px;font-size:13px;color:#475569;line-height:1.6;">${bold(t)}</div>`;
+      html += `<div style="padding:6px 14px;font-size:13px;color:#475569;line-height:1.6;">${linkify(bold(t))}</div>`;
     }
   }
   if (inCards) html += "</div>";
@@ -81,14 +96,26 @@ export async function POST(req: NextRequest) {
     // Check if this tool has a dedicated JSON template
     const toolJsonPrompt = toolId ? getToolPrompt(toolId) : null;
 
+    const fallbackFormatPrompt = `出力形式を厳守してください:
+
+1. # で大見出し（セクションタイトル、3-5個まで）
+2. **太字** でサブセクション見出し
+3. 各項目は適切な絵文字で始め、具体的で実用的な内容を記載
+4. 箇条書き（- ）で整理。各項目に具体例・数値・理由を含める
+5. 抽象的な説明ではなく、すぐに使える具体的なアドバイスを提供
+6. 重要なポイントは**太字**で強調
+7. 可能な場合は数値（金額、時間、回数等）を含めて具体性を持たせる
+
+回答は丁寧で読みやすく、専門知識がなくてもわかるようにしてください。`;
+
     const systemPrompt = toolJsonPrompt
       ? aiPrompt + localeInstruction + "\n\n" + toolJsonPrompt
-      : aiPrompt + localeInstruction + "\n\n見やすく構造化して出力してください。# で大見出し、**太字** でセクション見出しを使い、各項目は絵文字で始めてください。箇条書きで整理してください。";
+      : aiPrompt + localeInstruction + "\n\n" + fallbackFormatPrompt;
 
     const client = new Anthropic();
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: toolJsonPrompt ? 4096 : 2048,
+      max_tokens: toolJsonPrompt ? 4096 : 3072,
       system: systemPrompt,
       messages: [{ role: "user", content: userInput }],
     });
