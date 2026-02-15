@@ -5,6 +5,27 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { getToolPrompt, renderToolHtml } from "@/lib/tool-templates";
 
+// Simple in-memory rate limiter (per IP, resets on deploy)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 60; // max requests per window
+const RATE_WINDOW = 60 * 60 * 1000; // 1 hour
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT;
+}
+
+// Sanitize HTML to prevent XSS in rendered output
+function sanitizeForHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 // Fallback: text → styled HTML converter for tools without specific templates
 const FCOLORS = [
   { bg: "linear-gradient(135deg,#667eea,#764ba2)", light: "#f0f4ff", border: "#667eea", text: "#4338ca" },
@@ -64,6 +85,12 @@ function textToStyledHtml(text: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    // Server-side rate limiting
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+    if (isRateLimited(ip)) {
+      return NextResponse.json({ error: "Rate limit exceeded. Please try again later." }, { status: 429 });
+    }
+
     const body = await req.json();
     const { aiPrompt, userInput, locale, toolId } = body;
 
