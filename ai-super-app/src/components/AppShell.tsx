@@ -4,7 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { categories } from "@/data/categories";
 import { bundles } from "@/data/bundles";
 import { type Locale, LOCALES, getLocaleLabel, getDict, t } from "@/lib/i18n";
-import { canUse, getRemainingUses, isPremium, recordUse } from "@/lib/usage";
+import {
+  canUse,
+  getRemainingUses,
+  isPremium,
+  recordUse,
+  syncFromServer,
+  refreshPremiumStatus,
+} from "@/lib/usage";
+import { getDeviceId } from "@/lib/device-id";
 import type { Bundle, Tool } from "@/data/types";
 
 type View = "home" | "category" | "bundle" | "history";
@@ -56,6 +64,19 @@ export default function AppShell() {
   const [historyList, setHistoryList] = useState<HistoryEntry[]>([]);
   const [showInfo, setShowInfo] = useState(false);
   const [charCount, setCharCount] = useState(0);
+  const [checkingOut, setCheckingOut] = useState(false);
+
+  // On mount: check premium status from server (handles checkout redirect too)
+  useEffect(() => {
+    refreshPremiumStatus().then((premium) => {
+      if (premium) setRemaining(Infinity);
+      // Clean up checkout query params
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("checkout") || params.has("session_id")) {
+        window.history.replaceState({}, "", "/");
+      }
+    });
+  }, []);
 
   useEffect(() => {
     setDict(getDict(locale));
@@ -159,7 +180,10 @@ export default function AppShell() {
     try {
       const res = await fetch("/api/process", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-device-id": getDeviceId(),
+        },
         body: JSON.stringify({
           aiPrompt: tool.aiPrompt,
           userInput,
@@ -172,14 +196,22 @@ export default function AppShell() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "API error");
+        if (data.limitReached) {
+          setError(tt("nav.dailyLimitReached"));
+        } else {
+          setError(data.error || "API error");
+        }
       } else {
         setResults(data.results || []);
         if (data.html) {
           setHtmlPreview(data.html);
         }
-        // Record usage locally
-        recordUse();
+        // Sync usage from server response
+        if (data.usage) {
+          syncFromServer(data.usage);
+        } else {
+          recordUse();
+        }
         setRemaining(getRemainingUses());
         // Save to local history
         saveLocalHistory({
@@ -325,10 +357,37 @@ export default function AppShell() {
           </button>
           {!userIsPremium && (
             <button
-              onClick={() => alert(tt("nav.premiumComingSoon") || "プレミアムプランは近日公開予定です")}
-              className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+              disabled={checkingOut}
+              onClick={async () => {
+                setCheckingOut(true);
+                try {
+                  const res = await fetch("/api/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ deviceId: getDeviceId() }),
+                  });
+                  const data = await res.json();
+                  if (data.premium) {
+                    // Already subscribed
+                    const { setPremium } = await import("@/lib/usage");
+                    setPremium(true);
+                    setRemaining(Infinity);
+                  } else if (data.url) {
+                    window.location.href = data.url;
+                  } else if (data.error === "Payments not configured") {
+                    alert(tt("nav.premiumComingSoon") || "プレミアムプランは近日公開予定です");
+                  } else {
+                    alert(data.error || "Checkout failed");
+                  }
+                } catch {
+                  alert("Network error");
+                } finally {
+                  setCheckingOut(false);
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              プレミアム ¥980/月
+              {checkingOut ? "..." : "プレミアム ¥980/月"}
             </button>
           )}
         </div>
