@@ -56,11 +56,26 @@ function today(): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { aiPrompt, userInput, locale, bundleId, toolId } = await req.json();
+    const body = await req.json();
+    const { aiPrompt, userInput, locale, bundleId, toolId } = body;
 
     if (!aiPrompt || !userInput) {
       return NextResponse.json(
         { error: "Missing aiPrompt or userInput" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof aiPrompt !== "string" || typeof userInput !== "string") {
+      return NextResponse.json(
+        { error: "Invalid input types" },
+        { status: 400 }
+      );
+    }
+
+    if (userInput.length > 10000 || aiPrompt.length > 5000) {
+      return NextResponse.json(
+        { error: "Input too long" },
         { status: 400 }
       );
     }
@@ -287,10 +302,10 @@ export async function POST(req: NextRequest) {
       remaining = -1;
     }
 
-    return NextResponse.json({ results: lines, remaining, html, ...(imageDebug ? { _debug: imageDebug } : {}) });
+    return NextResponse.json({ results: lines, remaining, html });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("AI processing error:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 }

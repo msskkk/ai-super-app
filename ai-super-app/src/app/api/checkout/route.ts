@@ -31,7 +31,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const origin = req.headers.get("origin") || "http://localhost:3000";
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
+    const requestOrigin = req.headers.get("origin");
+    const origin =
+      requestOrigin && allowedOrigins.includes(requestOrigin)
+        ? requestOrigin
+        : process.env.NEXTAUTH_URL || "https://mt-2sby.vercel.app";
 
     const checkoutSession = await getStripe().checkout.sessions.create({
       mode: "subscription",
