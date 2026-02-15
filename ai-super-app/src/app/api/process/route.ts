@@ -3,10 +3,7 @@ export const maxDuration = 60;
 
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getToolPrompt, renderToolHtml } from "@/lib/tool-templates";
-
-const FREE_DAILY_LIMIT = 2;
 
 // Fallback: text → styled HTML converter for tools without specific templates
 const FCOLORS = [
@@ -50,14 +47,10 @@ function textToStyledHtml(text: string): string {
   return html;
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { aiPrompt, userInput, locale, bundleId, toolId } = body;
+    const { aiPrompt, userInput, locale, toolId } = body;
 
     if (!aiPrompt || !userInput) {
       return NextResponse.json(
@@ -78,42 +71,6 @@ export async function POST(req: NextRequest) {
         { error: "Input too long" },
         { status: 400 }
       );
-    }
-
-    // Usage check (DB available only)
-    let userId: string | null = null;
-    let isPremium = false;
-
-    if (prisma) {
-      try {
-        const { getServerSession } = await import("next-auth");
-        const { authOptions } = await import("@/lib/auth");
-        const session = await getServerSession(authOptions);
-
-        if (session?.user?.email) {
-          const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-          });
-          if (user) {
-            userId = user.id;
-            isPremium = user.isPremium;
-
-            if (!isPremium) {
-              const usage = await prisma.usage.findUnique({
-                where: { userId_date: { userId: user.id, date: today() } },
-              });
-              if (usage && usage.count >= FREE_DAILY_LIMIT) {
-                return NextResponse.json(
-                  { error: "daily_limit", remaining: 0 },
-                  { status: 429 }
-                );
-              }
-            }
-          }
-        }
-      } catch {
-        // Auth/DB not available, continue without
-      }
     }
 
     const localeInstruction =
@@ -145,7 +102,6 @@ export async function POST(req: NextRequest) {
       logo: { width: 1024, height: 1024, aspect: "1:1" },
       mockup: { width: 576, height: 1024, aspect: "9:16" },
     };
-    let imageDebug: string | null = null;
     const imageApiKey = process.env.TOGETHER_API_KEY || process.env.REPLICATE_API_TOKEN;
     const imageProvider = process.env.TOGETHER_API_KEY ? "together" : process.env.REPLICATE_API_TOKEN ? "replicate" : null;
     const imageConfig = toolId ? IMAGE_TOOLS[toolId] : null;
@@ -156,10 +112,7 @@ export async function POST(req: NextRequest) {
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
           if (parsed.imagePrompt) {
-            imageDebug = `${imageProvider}:calling`;
-
             if (imageProvider === "together") {
-              // Together AI - synchronous, returns base64
               const res = await fetch("https://api.together.xyz/v1/images/generations", {
                 method: "POST",
                 headers: {
@@ -176,22 +129,15 @@ export async function POST(req: NextRequest) {
                 }),
               });
 
-              if (!res.ok) {
-                const errText = await res.text();
-                imageDebug = `together:error:${res.status}:${errText.slice(0, 200)}`;
-              } else {
+              if (res.ok) {
                 const data = await res.json();
                 const b64 = data.data?.[0]?.b64_json;
                 if (b64) {
                   parsed.imageUrl = `data:image/png;base64,${b64}`;
                   text = JSON.stringify(parsed);
-                  imageDebug = "together:ok";
-                } else {
-                  imageDebug = `together:no_output`;
                 }
               }
             } else {
-              // Replicate fallback
               const res = await fetch(
                 "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions",
                 {
@@ -205,9 +151,7 @@ export async function POST(req: NextRequest) {
                   }),
                 }
               );
-              if (!res.ok) {
-                imageDebug = `replicate:error:${res.status}`;
-              } else {
+              if (res.ok) {
                 let imgData = await res.json();
                 while (imgData.status === "starting" || imgData.status === "processing") {
                   await new Promise((r) => setTimeout(r, 1500));
@@ -221,19 +165,14 @@ export async function POST(req: NextRequest) {
                 if (imgData.status === "succeeded" && imageUrl) {
                   parsed.imageUrl = imageUrl;
                   text = JSON.stringify(parsed);
-                  imageDebug = "replicate:ok";
-                } else {
-                  imageDebug = `replicate:fail:${imgData.status}`;
                 }
               }
             }
           }
         }
-      } catch (e) {
-        imageDebug = `exception:${e instanceof Error ? e.message : String(e)}`;
+      } catch {
+        // Image generation failed, continue without image
       }
-    } else if (imageConfig) {
-      imageDebug = "no_image_api_key";
     }
 
     // Try template-based rendering first, fallback to text-to-HTML
@@ -242,8 +181,6 @@ export async function POST(req: NextRequest) {
       html = renderToolHtml(toolId, text, userInput);
     }
     if (!html) {
-      // If the AI returned JSON (for a template tool) but rendering failed,
-      // don't display raw JSON as text - show a friendly fallback instead
       const looksLikeJson = /^\s*[\{```]/.test(text.trim());
       if (toolJsonPrompt && looksLikeJson) {
         html = `<div style="max-width:480px;margin:0 auto;font-family:${SF};text-align:center;padding:40px 20px;">
@@ -261,48 +198,7 @@ export async function POST(req: NextRequest) {
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
-    // Record usage & save history (DB available only)
-    if (prisma && userId) {
-      try {
-        await prisma.usage.upsert({
-          where: { userId_date: { userId, date: today() } },
-          update: { count: { increment: 1 } },
-          create: { userId, date: today(), count: 1 },
-        });
-
-        if (bundleId && toolId) {
-          await prisma.history.create({
-            data: {
-              userId,
-              bundleId,
-              toolId,
-              input: userInput.slice(0, 500),
-              output: JSON.stringify(lines),
-              locale: locale || "ja",
-            },
-          });
-        }
-      } catch {
-        // DB write failed, continue
-      }
-    }
-
-    // Compute remaining uses
-    let remaining = FREE_DAILY_LIMIT;
-    if (prisma && userId && !isPremium) {
-      try {
-        const usage = await prisma.usage.findUnique({
-          where: { userId_date: { userId, date: today() } },
-        });
-        remaining = Math.max(0, FREE_DAILY_LIMIT - (usage?.count ?? 0));
-      } catch {
-        // ignore
-      }
-    } else if (isPremium) {
-      remaining = -1;
-    }
-
-    return NextResponse.json({ results: lines, remaining, html });
+    return NextResponse.json({ results: lines, html });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("AI processing error:", msg);
