@@ -83,12 +83,12 @@ const logo: ToolTemplate = {
 // ─── TRAVEL PLAN ───
 const plan: ToolTemplate = {
   prompt: `必ずJSON形式のみで回答（説明テキスト不要、JSONだけ）:
-{"title":"タイトル","subtitle":"例: 4泊5日 バルセロナ建築とグルメの旅","days":[{"day":1,"theme":"テーマ","activities":[{"time":"09:00","title":"名称","detail":"具体的な説明（見どころ、所要時間、なぜおすすめか）","icon":"絵文字","cost":"¥5000","duration":"2時間","url":"https://公式サイトまたはGoogle Maps URL","category":"観光|グルメ|移動|体験"}],"meals":[{"type":"昼食","name":"店名","genre":"ジャンル","price":"¥2000","recommend":"おすすめメニュー","url":"https://食べログやGoogle Maps等のURL"}],"hotel":{"name":"ホテル名","area":"エリア","price":"¥25000/泊","rating":4.5,"url":"https://予約サイトURL","features":["駅近","朝食付き"]}}],"budget":{"transport":0,"hotel":0,"food":0,"activity":0},"packing":["必須の持ち物1","持ち物2"],"tips":["実用的なアドバイス1"]}
-重要: 必ず最大5日分に絞ってください（それ以上の日数でも5日にまとめる）。各日2-3アクティビティ、meals1件まで。URLは省略可。JSONが途切れないよう簡潔に。`,
+{"title":"タイトル","subtitle":"例: 4泊5日 バルセロナ建築とグルメの旅","days":[{"day":1,"theme":"テーマ","activities":[{"time":"09:00","title":"名称","detail":"具体的な説明（見どころ、所要時間、なぜおすすめか）","icon":"絵文字","cost":"¥5000","duration":"2時間","category":"観光|グルメ|移動|体験"}],"meals":[{"type":"昼食","name":"店名","genre":"ジャンル","price":"¥2000","recommend":"おすすめメニュー"}],"hotel":{"name":"ホテル名","area":"エリア","price":"¥25000/泊","rating":4.5,"features":["駅近","朝食付き"]}}],"budget":{"transport":0,"hotel":0,"food":0,"activity":0},"packing":["必須の持ち物1","持ち物2"],"tips":["実用的なアドバイス1"]}
+重要: 必ず最大5日分に絞ってください（それ以上の日数でも5日にまとめる）。各日2-3アクティビティ、meals1件まで。URLは含めないでください。JSONが途切れないよう簡潔に。`,
   render: (raw, _ui) => {
-    type Activity = { time: string; title: string; detail: string; icon: string; cost: string; duration?: string; url?: string; category?: string };
-    type Meal = { type: string; name: string; genre?: string; price?: string; recommend?: string; url?: string };
-    type Hotel = { name: string; area: string; price: string; rating: number; url?: string; features?: string[] };
+    type Activity = { time: string; title: string; detail: string; icon: string; cost: string; duration?: string; category?: string };
+    type Meal = { type: string; name: string; genre?: string; price?: string; recommend?: string };
+    type Hotel = { name: string; area: string; price: string; rating: number; features?: string[] };
     type Day = { day: number; theme: string; activities: Activity[]; meals?: Meal[]; hotel?: Hotel };
     type PlanData = { title: string; subtitle?: string; days: Day[]; budget?: Record<string, number>; packing?: string[]; tips?: string[] };
     const d = parseJSON(raw) as PlanData | null;
@@ -129,7 +129,7 @@ const plan: ToolTemplate = {
             </div>
             <div style="font-size:14px;font-weight:700;color:#1e293b;margin-top:3px;">${a.title}</div>
             ${a.detail ? `<div style="font-size:11px;color:#64748b;margin-top:3px;line-height:1.5;">${a.detail}</div>` : ""}
-            ${a.url ? `<a href="${a.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#3b82f6;margin-top:4px;text-decoration:none;font-weight:600;">🔗 詳細を見る</a>` : ""}
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.title)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#3b82f6;margin-top:4px;text-decoration:none;font-weight:600;">🔗 詳細を見る</a>
           </div>
         </div>`;
       });
@@ -146,7 +146,7 @@ const plan: ToolTemplate = {
               ${m.genre ? `<span style="margin-right:8px;">${m.genre}</span>` : ""}
               ${m.recommend ? `<span>👨‍🍳 ${m.recommend}</span>` : ""}
             </div>` : ""}
-            ${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#ea580c;margin-top:4px;text-decoration:none;font-weight:600;">🔗 お店を見る</a>` : ""}
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(m.name + " " + (m.genre || ""))}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#ea580c;margin-top:4px;text-decoration:none;font-weight:600;">🔗 お店を見る</a>
           </div>`;
         });
       }
@@ -163,7 +163,7 @@ const plan: ToolTemplate = {
             <span style="font-size:12px;font-weight:700;color:#92400e;">${h.price || ""}</span>
           </div>
           ${h.features?.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">${h.features.map((f: string) => `<span style="font-size:9px;background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:99px;border:1px solid #fde047;">✓ ${f}</span>`).join("")}</div>` : ""}
-          ${h.url ? `<a href="${h.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#b45309;margin-top:6px;text-decoration:none;font-weight:600;">🔗 予約サイト</a>` : ""}
+          <a href="https://www.google.com/search?q=${encodeURIComponent(h.name + " " + (h.area || "") + " 予約")}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#b45309;margin-top:6px;text-decoration:none;font-weight:600;">🔗 予約サイト</a>
         </div>`;
       }
     });
