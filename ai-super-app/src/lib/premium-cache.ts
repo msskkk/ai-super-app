@@ -49,6 +49,52 @@ export async function checkPremium(deviceId: string): Promise<boolean> {
   }
 }
 
+/** Check if a device has an active RevenueCat subscription (native IAP). */
+export async function checkRevenueCatPremium(
+  deviceId: string
+): Promise<boolean> {
+  if (!deviceId) return false;
+
+  // Check shared cache first
+  const cached = cache.get(deviceId);
+  if (cached && Date.now() - cached.checkedAt < CACHE_TTL) {
+    return cached.premium;
+  }
+
+  const rcApiKey = process.env.REVENUECAT_API_KEY;
+  if (!rcApiKey) return false;
+
+  try {
+    const res = await fetch(
+      `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(deviceId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${rcApiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!res.ok) return false;
+
+    const data = await res.json();
+    const entitlements = data.subscriber?.entitlements ?? {};
+    const premiumEntitlement = entitlements["premium"];
+
+    if (premiumEntitlement) {
+      const expiresDate = new Date(premiumEntitlement.expires_date);
+      const isActive = expiresDate > new Date();
+      cache.set(deviceId, { premium: isActive, checkedAt: Date.now() });
+      return isActive;
+    }
+
+    cache.set(deviceId, { premium: false, checkedAt: Date.now() });
+    return false;
+  } catch {
+    return cached?.premium ?? false;
+  }
+}
+
 /** Proactively update cache (called from webhook). */
 export function setCachePremium(deviceId: string, premium: boolean) {
   cache.set(deviceId, { premium, checkedAt: Date.now() });

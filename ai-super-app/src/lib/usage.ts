@@ -1,4 +1,5 @@
 import { getDeviceId } from "./device-id";
+import { getPlatform } from "./platform";
 
 const STORAGE_KEY = "ai-super-app-usage";
 const FREE_DAILY_LIMIT = 10;
@@ -84,6 +85,11 @@ export async function refreshPremiumStatus(): Promise<boolean> {
     if (!deviceId) return false;
 
     const url = new URL("/api/subscription", window.location.origin);
+    // Pass platform so server can check RevenueCat for native apps
+    const platform = getPlatform();
+    if (platform !== "web") {
+      url.searchParams.set("platform", platform);
+    }
     // Check if we just came back from checkout
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");

@@ -13,7 +13,8 @@ import {
   refreshPremiumStatus,
 } from "@/lib/usage";
 import { getDeviceId } from "@/lib/device-id";
-import { getPlatform } from "@/lib/platform";
+import { getPlatform, isNativeApp } from "@/lib/platform";
+import { initIAP, purchasePremium, restorePurchases } from "@/lib/iap";
 import type { Bundle, Tool } from "@/data/types";
 
 type View = "home" | "category" | "bundle" | "history";
@@ -67,8 +68,13 @@ export default function AppShell() {
   const [charCount, setCharCount] = useState(0);
   const [checkingOut, setCheckingOut] = useState(false);
 
-  // On mount: check premium status from server (handles checkout redirect too)
+  // On mount: init IAP and check premium status
   useEffect(() => {
+    // Initialize RevenueCat for native platforms
+    if (isNativeApp()) {
+      initIAP();
+    }
+
     refreshPremiumStatus().then((premium) => {
       if (premium) setRemaining(Infinity);
       // Clean up checkout query params
@@ -363,10 +369,23 @@ export default function AppShell() {
               onClick={async () => {
                 const platform = getPlatform();
 
-                // Native app: use native IAP (to be implemented with RevenueCat/StoreKit)
+                // Native app: use RevenueCat IAP
                 if (platform === "ios" || platform === "android") {
-                  // TODO: Implement native IAP via Capacitor plugin
-                  alert(tt("nav.premiumComingSoon") || "プレミアムプランは近日公開予定です");
+                  setCheckingOut(true);
+                  try {
+                    const result = await purchasePremium();
+                    if (result.success) {
+                      const { setPremium } = await import("@/lib/usage");
+                      setPremium(true);
+                      setRemaining(Infinity);
+                    } else if (result.error && result.error !== "cancelled") {
+                      alert(result.error);
+                    }
+                  } catch {
+                    alert("Purchase failed");
+                  } finally {
+                    setCheckingOut(false);
+                  }
                   return;
                 }
 
@@ -399,6 +418,32 @@ export default function AppShell() {
               className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60"
             >
               {checkingOut ? "..." : tt("nav.upgradePremium")}
+            </button>
+          )}
+          {/* Restore Purchases button (required by Apple for native apps) */}
+          {!userIsPremium && isNativeApp() && (
+            <button
+              disabled={checkingOut}
+              onClick={async () => {
+                setCheckingOut(true);
+                try {
+                  const restored = await restorePurchases();
+                  if (restored) {
+                    const { setPremium } = await import("@/lib/usage");
+                    setPremium(true);
+                    setRemaining(Infinity);
+                  } else {
+                    alert(tt("nav.noRestorablePurchases") || "復元できる購入がありません");
+                  }
+                } catch {
+                  alert("Restore failed");
+                } finally {
+                  setCheckingOut(false);
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-60"
+            >
+              {tt("nav.restorePurchases") || "購入を復元"}
             </button>
           )}
         </div>

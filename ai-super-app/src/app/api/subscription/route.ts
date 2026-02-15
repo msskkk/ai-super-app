@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
-import { checkPremium, setCachePremium } from "@/lib/premium-cache";
+import { checkPremium, checkRevenueCatPremium, setCachePremium } from "@/lib/premium-cache";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   const rawDeviceId = req.headers.get("x-device-id");
   const deviceId = rawDeviceId && UUID_RE.test(rawDeviceId) ? rawDeviceId : null;
   const sessionId = req.nextUrl.searchParams.get("session_id");
+  const platform = req.nextUrl.searchParams.get("platform"); // "ios" | "android" | "web"
 
   // After checkout redirect: verify via session ID (avoids search indexing delay)
   if (sessionId && deviceId) {
@@ -44,6 +45,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ premium: false });
   }
 
+  // For native platforms, also check RevenueCat
+  if (platform === "ios" || platform === "android") {
+    const rcPremium = await checkRevenueCatPremium(deviceId);
+    if (rcPremium) {
+      return NextResponse.json({ premium: true, source: "revenuecat" });
+    }
+  }
+
+  // Check Stripe (web) subscription
   const premium = await checkPremium(deviceId);
   return NextResponse.json({ premium });
 }

@@ -24,7 +24,9 @@
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
     "upgradePremium": "Premium $6.99/mo",
-    "premiumComingSoon": "Premium plan coming soon"
+    "premiumComingSoon": "Premium plan coming soon",
+    "restorePurchases": "Restore Purchases",
+    "noRestorablePurchases": "No purchases to restore"
   },
   "categories": {
     "life": { "name": "Lifestyle" },

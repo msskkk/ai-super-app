@@ -24,7 +24,9 @@
     "privacy": "隐私政策",
     "terms": "使用条款",
     "upgradePremium": "高级版 ¥980/月",
-    "premiumComingSoon": "高级计划即将推出"
+    "premiumComingSoon": "高级计划即将推出",
+    "restorePurchases": "恢复购买",
+    "noRestorablePurchases": "没有可恢复的购买"
   },
   "categories": {
     "life": { "name": "生活" },

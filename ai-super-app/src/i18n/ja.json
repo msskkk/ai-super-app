@@ -25,7 +25,9 @@
     "privacy": "プライバシーポリシー",
     "terms": "利用規約",
     "upgradePremium": "プレミアム ¥980/月",
-    "premiumComingSoon": "プレミアムプランは近日公開予定です"
+    "premiumComingSoon": "プレミアムプランは近日公開予定です",
+    "restorePurchases": "購入を復元",
+    "noRestorablePurchases": "復元できる購入がありません"
   },
   "categories": {
     "life": { "name": "暮らし" },
