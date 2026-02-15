@@ -577,7 +577,7 @@ export default function AppShell() {
           <div className="mt-5 fadein">
             <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
               <iframe
-                sandbox="allow-popups allow-popups-to-escape-sandbox"
+                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                 srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:;"><style>*{box-sizing:border-box}body{margin:0;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6;-webkit-font-smoothing:antialiased}img{max-width:100%;border-radius:12px;}</style></head><body>${htmlPreview}</body></html>`}
                 className="w-full border-0"
                 style={{ minHeight: "500px" }}
@@ -606,11 +606,12 @@ export default function AppShell() {
               </button>
               <button
                 onClick={() => {
-                  const text = results.join("\n");
+                  const iframe = document.querySelector("iframe");
+                  const text = iframe?.contentDocument?.body?.innerText || results.join("\n");
                   navigator.clipboard.writeText(text).then(() => {
                     const btn = document.getElementById("copy-btn");
                     if (btn) { btn.textContent = "✓ コピー済み"; setTimeout(() => { btn.textContent = "📋 コピー"; }, 1500); }
-                  });
+                  }).catch(() => {});
                 }}
                 id="copy-btn"
                 className="px-4 py-2 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
@@ -651,7 +652,7 @@ export default function AppShell() {
                   navigator.clipboard.writeText(results.join("\n")).then(() => {
                     const btn = document.getElementById("copy-btn2");
                     if (btn) { btn.textContent = "✓ コピー済み"; setTimeout(() => { btn.textContent = "📋 コピー"; }, 1500); }
-                  });
+                  }).catch(() => {});
                 }}
                 id="copy-btn2"
                 className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
