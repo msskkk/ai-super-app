@@ -4,6 +4,7 @@ export const maxDuration = 60;
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { getToolPrompt, renderToolHtml } from "@/lib/tool-templates";
+import { checkPremium, checkAndRecordUsage } from "@/lib/premium-cache";
 
 // Simple in-memory rate limiter (per IP, resets on deploy)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -89,6 +90,22 @@ export async function POST(req: NextRequest) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
     if (isRateLimited(ip)) {
       return NextResponse.json({ error: "Rate limit exceeded. Please try again later." }, { status: 429 });
+    }
+
+    // Server-side premium & usage check
+    const deviceId = req.headers.get("x-device-id") || "";
+    const premium = deviceId ? await checkPremium(deviceId) : false;
+    const usage = checkAndRecordUsage(deviceId || ip, premium);
+
+    if (!usage.allowed) {
+      return NextResponse.json(
+        {
+          error: "Daily free limit reached. Upgrade to Premium for unlimited use.",
+          limitReached: true,
+          remaining: 0,
+        },
+        { status: 429 }
+      );
     }
 
     const body = await req.json();
@@ -258,7 +275,11 @@ export async function POST(req: NextRequest) {
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
-    return NextResponse.json({ results: lines, html });
+    return NextResponse.json({
+      results: lines,
+      html,
+      usage: { remaining: usage.remaining, premium },
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("AI processing error:", msg);

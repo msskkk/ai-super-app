@@ -1,3 +1,5 @@
+import { getDeviceId } from "./device-id";
+
 const STORAGE_KEY = "ai-super-app-usage";
 const FREE_DAILY_LIMIT = 10;
 
@@ -59,4 +61,45 @@ export function setPremium(val: boolean) {
   const u = getUsage();
   u.isPremium = val;
   saveUsage(u);
+}
+
+/** Sync premium status from server response. */
+export function syncFromServer(serverUsage: {
+  remaining: number;
+  premium: boolean;
+}) {
+  const u = getUsage();
+  u.isPremium = serverUsage.premium;
+  if (serverUsage.remaining >= 0) {
+    u.count = FREE_DAILY_LIMIT - serverUsage.remaining;
+  }
+  u.date = today();
+  saveUsage(u);
+}
+
+/** Check subscription status from server on app load. */
+export async function refreshPremiumStatus(): Promise<boolean> {
+  try {
+    const deviceId = getDeviceId();
+    if (!deviceId) return false;
+
+    const url = new URL("/api/subscription", window.location.origin);
+    // Check if we just came back from checkout
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    if (sessionId) {
+      url.searchParams.set("session_id", sessionId);
+    }
+
+    const res = await fetch(url.toString(), {
+      headers: { "x-device-id": deviceId },
+    });
+    if (!res.ok) return isPremium();
+
+    const data = await res.json();
+    setPremium(data.premium);
+    return data.premium;
+  } catch {
+    return isPremium();
+  }
 }
