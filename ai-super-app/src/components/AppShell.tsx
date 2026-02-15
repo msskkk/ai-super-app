@@ -55,9 +55,11 @@ export default function AppShell() {
   const [remaining, setRemaining] = useState(() => getRemainingUses());
   const [historyList, setHistoryList] = useState<HistoryEntry[]>([]);
   const [showInfo, setShowInfo] = useState(false);
+  const [charCount, setCharCount] = useState(0);
 
   useEffect(() => {
     setDict(getDict(locale));
+    document.documentElement.lang = locale;
   }, [locale]);
 
   const tt = useCallback(
@@ -202,7 +204,7 @@ export default function AppShell() {
           <button
             key={l}
             onClick={() => setLocale(l)}
-            className={`px-2 py-1 text-[10px] rounded-full transition-colors ${
+            className={`px-3 py-1.5 text-xs rounded-full transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center ${
               locale === l
                 ? "bg-gray-800 text-white"
                 : "bg-gray-200 text-gray-500 hover:bg-gray-300"
@@ -322,7 +324,10 @@ export default function AppShell() {
             履歴
           </button>
           {!userIsPremium && (
-            <button className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity">
+            <button
+              onClick={() => alert(tt("nav.premiumComingSoon") || "プレミアムプランは近日公開予定です")}
+              className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+            >
               プレミアム ¥980/月
             </button>
           )}
@@ -503,11 +508,18 @@ export default function AppShell() {
               </div>
             )}
             {tool.type === "text-input" && (
-              <textarea
-                className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                rows={4}
-                placeholder={tool.placeholder || ""}
-              />
+              <div className="relative">
+                <textarea
+                  className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  rows={4}
+                  placeholder={tool.placeholder || ""}
+                  maxLength={10000}
+                  onChange={(e) => setCharCount(e.target.value.length)}
+                />
+                <span className={`absolute bottom-2 right-3 text-[10px] ${charCount > 9000 ? "text-red-400" : "text-gray-300"}`}>
+                  {charCount > 0 ? `${charCount}/10000` : ""}
+                </span>
+              </div>
             )}
             {tool.type === "form-input" &&
               tool.fields?.map((f, i) => (
@@ -530,13 +542,16 @@ export default function AppShell() {
             className={`mt-4 w-full py-3 rounded-xl text-white font-semibold text-sm bg-gradient-to-r ${bundle.gradient} hover:opacity-90 transition-opacity active:scale-[0.98] disabled:opacity-60`}
           >
             {processing ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="flex gap-1">
-                  <span className="w-2 h-2 bg-white rounded-full dot1 inline-block" />
-                  <span className="w-2 h-2 bg-white rounded-full dot2 inline-block" />
-                  <span className="w-2 h-2 bg-white rounded-full dot3 inline-block" />
+              <span className="flex flex-col items-center justify-center gap-1">
+                <span className="flex items-center gap-2">
+                  <span className="flex gap-1">
+                    <span className="w-2 h-2 bg-white rounded-full dot1 inline-block" />
+                    <span className="w-2 h-2 bg-white rounded-full dot2 inline-block" />
+                    <span className="w-2 h-2 bg-white rounded-full dot3 inline-block" />
+                  </span>
+                  {tt("nav.processing")}
                 </span>
-                {tt("nav.processing")}
+                <span className="text-[10px] text-white/60">AIが分析中です…少々お待ちください</span>
               </span>
             ) : (
               `${tool.emoji} ${tt("nav.process")}`
@@ -546,8 +561,14 @@ export default function AppShell() {
 
         {/* Error */}
         {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 fadein">
-            {error}
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl fadein">
+            <p className="text-sm text-red-600">{error}</p>
+            <button
+              onClick={processAI}
+              className="mt-2 px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+            >
+              もう一度試す
+            </button>
           </div>
         )}
 
@@ -556,7 +577,7 @@ export default function AppShell() {
           <div className="mt-5 fadein">
             <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
               <iframe
-                sandbox="allow-same-origin"
+                sandbox=""
                 srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:;"><style>*{box-sizing:border-box}body{margin:0;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6;-webkit-font-smoothing:antialiased}img{max-width:100%;border-radius:12px;}</style></head><body>${htmlPreview}</body></html>`}
                 className="w-full border-0"
                 style={{ minHeight: "500px" }}
@@ -582,6 +603,19 @@ export default function AppShell() {
                 className={`px-4 py-2 text-xs font-medium text-white rounded-lg bg-gradient-to-r ${bundle.gradient} hover:opacity-90 transition-opacity`}
               >
                 {tt("nav.regenerate")}
+              </button>
+              <button
+                onClick={() => {
+                  const text = results.join("\n");
+                  navigator.clipboard.writeText(text).then(() => {
+                    const btn = document.getElementById("copy-btn");
+                    if (btn) { btn.textContent = "✓ コピー済み"; setTimeout(() => { btn.textContent = "📋 コピー"; }, 1500); }
+                  });
+                }}
+                id="copy-btn"
+                className="px-4 py-2 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                📋 コピー
               </button>
             </div>
           </div>
@@ -611,6 +645,18 @@ export default function AppShell() {
                 className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 {tt("nav.regenerate")}
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(results.join("\n")).then(() => {
+                    const btn = document.getElementById("copy-btn2");
+                    if (btn) { btn.textContent = "✓ コピー済み"; setTimeout(() => { btn.textContent = "📋 コピー"; }, 1500); }
+                  });
+                }}
+                id="copy-btn2"
+                className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                📋 コピー
               </button>
             </div>
           </div>
