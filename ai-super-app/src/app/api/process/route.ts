@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     const client = new Anthropic();
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: toolJsonPrompt ? 4096 : 3072,
+      max_tokens: toolJsonPrompt ? 6144 : 3072,
       system: systemPrompt,
       messages: [{ role: "user", content: userInput }],
     });
@@ -208,16 +208,20 @@ export async function POST(req: NextRequest) {
       html = renderToolHtml(toolId, text, userInput);
     }
     if (!html) {
-      const looksLikeJson = /^\s*[\{```]/.test(text.trim());
-      if (toolJsonPrompt && looksLikeJson) {
-        html = `<div style="max-width:480px;margin:0 auto;font-family:${SF};text-align:center;padding:40px 20px;">
-          <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:8px;">表示の処理中にエラーが発生しました</div>
-          <div style="font-size:12px;color:#64748b;">もう一度お試しください</div>
-        </div>`;
-      } else {
-        html = textToStyledHtml(text);
+      // JSON template failed — extract readable text from JSON and render as styled HTML
+      let displayText = text;
+      if (toolJsonPrompt && /^\s*[\{`]/.test(text.trim())) {
+        // Try to extract useful text from JSON values
+        try {
+          const jsonStr = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
+          const values: string[] = [];
+          jsonStr.replace(/"(?:title|theme|detail|name|recommend|tips|advice|packing)"\s*:\s*"([^"]+)"/g, (_, v) => { values.push(v); return _; });
+          if (values.length > 3) {
+            displayText = values.join("\n");
+          }
+        } catch { /* ignore */ }
       }
+      html = textToStyledHtml(displayText);
     }
 
     const lines = text

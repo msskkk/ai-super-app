@@ -12,8 +12,10 @@ function parseJSON(raw: string): unknown | null {
   if (i > 0) str = str.slice(i);
   if (i < 0) return null;
   try { return JSON.parse(str); } catch {}
-  // Fix truncated JSON
-  for (let n = 0; n < 15; n++) {
+  // Remove trailing incomplete string/value (truncated output)
+  str = str.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"{}[\]]*$/, "");
+  // Fix truncated JSON by closing brackets/braces
+  for (let n = 0; n < 30; n++) {
     const open = (str.match(/\[/g) || []).length - (str.match(/\]/g) || []).length;
     const brace = (str.match(/\{/g) || []).length - (str.match(/\}/g) || []).length;
     if (open > 0) str += "]";
@@ -82,7 +84,7 @@ const logo: ToolTemplate = {
 const plan: ToolTemplate = {
   prompt: `必ずJSON形式のみで回答（説明テキスト不要、JSONだけ）:
 {"title":"タイトル","subtitle":"例: 4泊5日 バルセロナ建築とグルメの旅","days":[{"day":1,"theme":"テーマ","activities":[{"time":"09:00","title":"名称","detail":"具体的な説明（見どころ、所要時間、なぜおすすめか）","icon":"絵文字","cost":"¥5000","duration":"2時間","url":"https://公式サイトまたはGoogle Maps URL","category":"観光|グルメ|移動|体験"}],"meals":[{"type":"昼食","name":"店名","genre":"ジャンル","price":"¥2000","recommend":"おすすめメニュー","url":"https://食べログやGoogle Maps等のURL"}],"hotel":{"name":"ホテル名","area":"エリア","price":"¥25000/泊","rating":4.5,"url":"https://予約サイトURL","features":["駅近","朝食付き"]}}],"budget":{"transport":0,"hotel":0,"food":0,"activity":0},"packing":["必須の持ち物1","持ち物2"],"tips":["実用的なアドバイス1"]}
-日数が多い場合は主要5日分に絞ってください。各日3-4アクティビティまで。具体的な店名・スポット名・URLを可能な限り含めてください。`,
+重要: 必ず最大5日分に絞ってください（それ以上の日数でも5日にまとめる）。各日2-3アクティビティ、meals1件まで。URLは省略可。JSONが途切れないよう簡潔に。`,
   render: (raw, _ui) => {
     type Activity = { time: string; title: string; detail: string; icon: string; cost: string; duration?: string; url?: string; category?: string };
     type Meal = { type: string; name: string; genre?: string; price?: string; recommend?: string; url?: string };
